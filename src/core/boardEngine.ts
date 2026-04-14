@@ -94,3 +94,94 @@ export const initializeBoard = (
   board = calculateAdjacentMines(board);
   return board;
 };
+
+// Revelar una celda (y aplicar cascada si es 0)
+export const revealCell = (
+  board: BoardData,
+  row: number,
+  col: number,
+): { newBoard: BoardData; hitMine: boolean } => {
+  // Deep copy para mantener la inmutabilidad de React
+  const newBoard: BoardData = board.map((r) => r.map((c) => ({ ...c })));
+  const cell = newBoard[row][col];
+
+  // Si ya está revelada o tiene bandera, no hacemos nada
+  if (cell.isRevealed || cell.isFlagged) {
+    return { newBoard, hitMine: false };
+  }
+
+  // Revelamos la celda seleccionada
+  cell.isRevealed = true;
+
+  // Si es mina, el juego termina
+  if (cell.isMine) {
+    return { newBoard, hitMine: true };
+  }
+
+  // Algoritmo "Flood Fill" (BFS - Breadth-First Search) para la cascada
+  if (cell.adjacentMines === 0) {
+    const queue: number[][] = [[row, col]];
+
+    while (queue.length > 0) {
+      // Tomamos la primera coordenada de la cola
+      const [r, c] = queue.shift()!;
+
+      // Revisamos sus vecinos
+      ADJACENT_DIRECTIONS.forEach(([dr, dc]) => {
+        const newRow = r + dr;
+        const newCol = c + dc;
+
+        const isRowValid = newRow >= 0 && newRow < newBoard.length;
+        const isColValid = newCol >= 0 && newCol < newBoard[0].length;
+
+        if (isRowValid && isColValid) {
+          const neighbor = newBoard[newRow][newCol];
+
+          // Si el vecino no está revelado, no tiene bandera y no es mina
+          if (!neighbor.isRevealed && !neighbor.isFlagged && !neighbor.isMine) {
+            neighbor.isRevealed = true;
+
+            // Si el vecino también es 0, lo agregamos a la cola para seguir expandiendo
+            if (neighbor.adjacentMines === 0) {
+              queue.push([newRow, newCol]);
+            }
+          }
+        }
+      });
+    }
+  }
+
+  return { newBoard, hitMine: false };
+};
+
+// Colocar o quitar una bandera
+export const toggleFlag = (
+  board: BoardData,
+  row: number,
+  col: number,
+): BoardData => {
+  const newBoard = board.map((r) => r.map((c) => ({ ...c })));
+  const cell = newBoard[row][col];
+
+  // Solo podemos poner bandera si la celda no está revelada
+  if (!cell.isRevealed) {
+    cell.isFlagged = !cell.isFlagged;
+  }
+
+  return newBoard;
+};
+
+// Comprobar si el jugador ha ganado
+export const checkWinCondition = (board: BoardData): boolean => {
+  for (let r = 0; r < board.length; r++) {
+    for (let c = 0; c < board[r].length; c++) {
+      const cell = board[r][c];
+      // Si hay una celda que NO es mina y NO está revelada, el juego aún no se gana
+      if (!cell.isMine && !cell.isRevealed) {
+        return false;
+      }
+    }
+  }
+  // Si revisó todo y todas las celdas seguras están reveladas, ¡Ganó!
+  return true;
+};
